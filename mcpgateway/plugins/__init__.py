@@ -556,3 +556,82 @@ async def stop_plugin_invalidation_listener() -> None:
         await task
     except asyncio.CancelledError:
         pass
+
+
+
+async def initialize_plugin_factory_with_cos() -> Optional["TenantPluginManagerFactory"]:
+    """Initialize plugin factory with COS support if enabled.
+    
+    Returns:
+        TenantPluginManagerFactory instance or None if plugins disabled
+        
+    Raises:
+        ValueError: If COS configuration is invalid
+    """
+    global _plugin_manager_factory  # noqa: PLW0603
+    
+    from mcpgateway.config import settings
+    
+    if not settings.plugins_enabled:
+        _logger.info("Plugins disabled (PLUGINS_ENABLED=false)")
+        return None
+    
+    config_path: str
+    
+    if settings.plugins_config_source == "cos":
+        _logger.info("Initializing plugins from IBM Cloud Object Storage")
+        
+        # Import and initialize COS loader
+        from mcpgateway.services.plugin_cos_loader import initialize_cos_loader
+        
+        cos_loader = initialize_cos_loader()
+        
+        # Perform initial download
+        local_config_path, _ = await cos_loader.download_plugins()
+        config_path = str(local_config_path)
+        
+        # Start background sync task
+        cos_loader.start_sync_task()
+        
+        _logger.info("COS plugin loader initialized (sync interval: %ds)", cos_loader.sync_interval)
+    else:
+        # Local filesystem mode
+        config_path = settings.plugins_config_file
+        _logger.info("Loading plugins from local filesystem: %s", config_path)
+    
+    # Import here to avoid circular dependency
+    from mcpgateway.db import SessionLocal
+    from mcpgateway.plugins.gateway_plugin_manager import TenantPluginManagerFactory
+    from mcpgateway.plugins.policy import get_hook_policies
+    
+    # Initialize factory
+    _plugin_manager_factory = TenantPluginManagerFactory(
+        yaml_path=config_path,
+        timeout=30,
+        observability=_observability_service,
+        hook_policies=get_hook_policies(),
+        cache_ttl=30,
+        db_factory=SessionLocal,
+    )
+    
+    _logger.info("Plugin factory initialized with %d plugins", len(_plugin_manager_factory.plugin_names))
+    
+    return _plugin_manager_factory
+
+
+async def shutdown_plugin_factory() -> None:
+    """Shutdown plugin factory and COS loader if active."""
+    global _plugin_manager_factory  # noqa: PLW0603
+    
+    from mcpgateway.config import settings
+    
+    # Stop COS sync if enabled
+    if settings.plugins_enabled and settings.plugins_config_source == "cos":
+        from mcpgateway.services.plugin_cos_loader import shutdown_cos_loader
+        
+        await shutdown_cos_loader()
+        _logger.info("COS plugin loader shutdown complete")
+    
+    # Clear factory reference
+    _plugin_manager_factory = None
+    _logger.info("Plugin factory shutdown complete")

@@ -1450,19 +1450,13 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         # plugins until restart. Keep initialisation unconditional; gate
         # *execution* on the shared toggle in ``get_plugin_manager``.
         # First-Party
-        from mcpgateway.plugins.policy import HOOK_PAYLOAD_POLICIES  # pylint: disable=import-outside-toplevel
+        from mcpgateway.plugins import initialize_plugin_factory_with_cos  # pylint: disable=import-outside-toplevel
 
         try:
-            init_plugin_manager_factory(
-                yaml_path=settings.plugins.config_file,
-                timeout=settings.plugins.plugin_timeout,
-                hook_policies=HOOK_PAYLOAD_POLICIES,
-                observability=None,  # Will be set later if needed
-                db_factory=SessionLocal,
-            )
+            await initialize_plugin_factory_with_cos()
             logger.info("Plugin manager factory initialized")
         except Exception as init_exc:
-            if settings.plugins.enabled:
+            if settings.plugins_enabled:
                 # Operator asked for plugins — a failed init (bad YAML, missing
                 # plugin module, validation error) must be a hard boot failure
                 # rather than a silent no-op. Preserve the original loud-crash
@@ -1721,9 +1715,12 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         except Exception as e:
             logger.debug(f"Error stopping plugin invalidation listener: {e}")
 
-        # Shutdown global plugin manager factory (no-op when plugins were never initialised)
+        # Shutdown global plugin manager factory and COS loader (no-op when plugins were never initialised)
         try:
-            await shutdown_plugin_manager_factory()
+            # First-Party
+            from mcpgateway.plugins import shutdown_plugin_factory  # pylint: disable=import-outside-toplevel
+
+            await shutdown_plugin_factory()
             logger.info("Plugin manager shutdown complete")
         except Exception as e:
             logger.error(f"Error shutting down plugin manager: {str(e)}")

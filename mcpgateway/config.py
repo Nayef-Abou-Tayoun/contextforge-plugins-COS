@@ -1225,6 +1225,48 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ===================================
+    # Plugin Configuration
+    # ===================================
+    plugins_enabled: bool = Field(default=False, description="Enable plugin framework")
+    plugins_config_file: str = Field(default="plugins/config.yaml", description="Path to plugin configuration file (local mode)")
+    
+    # IBM Cloud Object Storage (COS) Plugin Loading
+    plugins_config_source: Literal["local", "cos"] = Field(
+        default="local",
+        description="Plugin configuration source: 'local' for filesystem, 'cos' for IBM Cloud Object Storage"
+    )
+    plugins_cos_bucket: Optional[str] = Field(
+        default=None,
+        description="IBM COS bucket name for plugin storage (required when plugins_config_source=cos)"
+    )
+    plugins_cos_endpoint: Optional[str] = Field(
+        default=None,
+        description="IBM COS endpoint URL (e.g., https://s3.us-south.cloud-object-storage.appdomain.cloud)"
+    )
+    plugins_cos_api_key: Optional[SecretStr] = Field(
+        default=None,
+        description="IBM Cloud API key for COS authentication"
+    )
+    plugins_cos_instance_id: str = Field(
+        default="",
+        description="IBM COS service instance ID (optional, can be empty string)"
+    )
+    plugins_cos_config_path: str = Field(
+        default="plugins/config.yaml",
+        description="Path to config.yaml within COS bucket"
+    )
+    plugins_cos_sync_interval: int = Field(
+        default=300,
+        ge=30,
+        le=3600,
+        description="COS sync interval in seconds (30-3600, default 300 = 5 minutes)"
+    )
+    plugins_local_cache_dir: str = Field(
+        default="/tmp/contextforge-plugins",
+        description="Local cache directory for COS-downloaded plugins"
+    )
+
     # Values used to detect unconfigured or insecure deployment states
     SENTINEL_VALUES: ClassVar[list[str]] = ["", "UNCONFIGURED"]
     WEAK_VALUES: ClassVar[list[str]] = [
