@@ -609,7 +609,7 @@ async def initialize_plugin_factory_with_cos() -> Optional["TenantPluginManagerF
         if settings.plugins_config_source == "both":
             # Load COS config data for merging
             with open(local_config_path, "r") as f:
-                cos_config_data = yaml.safe_load(f)
+                cos_config_data = yaml.safe_load(f) or {}
             _logger.info("Loaded %d plugins from COS for merging", len(cos_config_data.get("plugins", [])))
     
     if settings.plugins_config_source in ("local", "both"):
