@@ -571,6 +571,7 @@ async def initialize_plugin_factory_with_cos() -> Optional["TenantPluginManagerF
     global _plugin_manager_factory  # noqa: PLW0603
     
     from mcpgateway.config import settings
+    import sys
     
     if not settings.plugins_enabled:
         _logger.info("Plugins disabled (PLUGINS_ENABLED=false)")
@@ -589,6 +590,12 @@ async def initialize_plugin_factory_with_cos() -> Optional["TenantPluginManagerF
         # Perform initial download
         local_config_path, _ = await cos_loader.download_plugins()
         config_path = str(local_config_path)
+        
+        # Add plugin directory to Python path so modules can be imported
+        plugin_dir = str(cos_loader.cache_dir / "plugins")
+        if plugin_dir not in sys.path:
+            sys.path.insert(0, plugin_dir)
+            _logger.info("Added plugin directory to Python path: %s", plugin_dir)
         
         # Start background sync task
         cos_loader.start_sync_task()
