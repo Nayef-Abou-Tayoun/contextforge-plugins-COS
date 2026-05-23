@@ -1,0 +1,12 @@
+# Test Configuration for COS Plugin Loading
+# This is a minimal config to test dynamic plugin loading from IBM Cloud Object Storage
+
+plugins:
+  - name: hello_world
+    kind: hello_world_plugin.HelloWorldPlugin
+    enabled: true
+    description: "Simple Hello World plugin loaded from COS"
+    version: "1.0.0"
+    hooks: []
+
+# Made with Bob

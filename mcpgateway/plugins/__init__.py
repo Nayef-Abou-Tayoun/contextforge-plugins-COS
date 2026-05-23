@@ -571,16 +571,21 @@ async def initialize_plugin_factory_with_cos() -> Optional["TenantPluginManagerF
     global _plugin_manager_factory  # noqa: PLW0603
     
     from mcpgateway.config import settings
+    import os
     import sys
+    import tempfile
+    import yaml
+    from pathlib import Path
     
     if not settings.plugins_enabled:
         _logger.info("Plugins disabled (PLUGINS_ENABLED=false)")
         return None
     
     config_path: str
+    cos_config_data: Optional[dict] = None
     
-    if settings.plugins_config_source == "cos":
-        _logger.info("Initializing plugins from IBM Cloud Object Storage")
+    if settings.plugins_config_source in ("cos", "both"):
+        _logger.info("Initializing plugins from IBM Cloud Object Storage (mode: %s)", settings.plugins_config_source)
         
         # Import and initialize COS loader
         from mcpgateway.services.plugin_cos_loader import initialize_cos_loader
@@ -589,22 +594,60 @@ async def initialize_plugin_factory_with_cos() -> Optional["TenantPluginManagerF
         
         # Perform initial download
         local_config_path, _ = await cos_loader.download_plugins()
-        config_path = str(local_config_path)
         
-        # Add plugin directory to Python path so modules can be imported
+        # Add COS plugin directory to Python path so modules can be imported
         plugin_dir = str(cos_loader.cache_dir / "plugins")
         if plugin_dir not in sys.path:
             sys.path.insert(0, plugin_dir)
-            _logger.info("Added plugin directory to Python path: %s", plugin_dir)
+            _logger.info("Added COS plugin directory to Python path: %s", plugin_dir)
         
         # Start background sync task
         cos_loader.start_sync_task()
         
         _logger.info("COS plugin loader initialized (sync interval: %ds)", cos_loader.sync_interval)
+        
+        if settings.plugins_config_source == "both":
+            # Load COS config data for merging
+            with open(local_config_path, "r") as f:
+                cos_config_data = yaml.safe_load(f)
+            _logger.info("Loaded %d plugins from COS for merging", len(cos_config_data.get("plugins", [])))
+    
+    if settings.plugins_config_source in ("local", "both"):
+        # Local filesystem mode or merge mode
+        local_config_path = settings.plugins_config_file
+        _logger.info("Loading plugins from local filesystem: %s", local_config_path)
+        
+        # Add local plugins directory to Python path
+        local_plugin_dir = str(Path(local_config_path).parent)
+        if local_plugin_dir not in sys.path:
+            sys.path.insert(0, local_plugin_dir)
+            _logger.info("Added local plugin directory to Python path: %s", local_plugin_dir)
+        
+        if settings.plugins_config_source == "both" and cos_config_data:
+            # Merge COS and local configs
+            with open(local_config_path, "r") as f:
+                local_config_data = yaml.safe_load(f)
+            
+            # Merge plugin lists (COS plugins first, then local)
+            merged_plugins = cos_config_data.get("plugins", []) + local_config_data.get("plugins", [])
+            merged_config = {"plugins": merged_plugins}
+            
+            # Write merged config to temp file
+            import tempfile
+            merged_fd, merged_path = tempfile.mkstemp(suffix=".yaml", prefix="plugins-merged-")
+            with os.fdopen(merged_fd, "w") as f:
+                yaml.dump(merged_config, f)
+            
+            config_path = merged_path
+            _logger.info("Merged %d COS plugins + %d local plugins = %d total",
+                        len(cos_config_data.get("plugins", [])),
+                        len(local_config_data.get("plugins", [])),
+                        len(merged_plugins))
+        else:
+            config_path = local_config_path
     else:
-        # Local filesystem mode
-        config_path = settings.plugins_config_file
-        _logger.info("Loading plugins from local filesystem: %s", config_path)
+        # COS-only mode
+        config_path = str(local_config_path)
     
     # Import here to avoid circular dependency
     from mcpgateway.db import SessionLocal
