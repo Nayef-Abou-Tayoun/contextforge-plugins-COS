@@ -602,14 +602,14 @@ async def initialize_plugin_factory_with_cos() -> Optional["TenantPluginManagerF
     # Import here to avoid circular dependency
     from mcpgateway.db import SessionLocal
     from mcpgateway.plugins.gateway_plugin_manager import TenantPluginManagerFactory
-    from mcpgateway.plugins.policy import get_hook_policies
+    from mcpgateway.plugins.policy import HOOK_PAYLOAD_POLICIES
     
     # Initialize factory
     _plugin_manager_factory = TenantPluginManagerFactory(
         yaml_path=config_path,
         timeout=30,
         observability=_observability_service,
-        hook_policies=get_hook_policies(),
+        hook_policies=HOOK_PAYLOAD_POLICIES,
         cache_ttl=30,
         db_factory=SessionLocal,
     )
