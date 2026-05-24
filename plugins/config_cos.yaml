@@ -1,0 +1,33 @@
+# Simple Tool Cost Tracker Plugin Configuration for COS
+# Perfect for bootcamp demonstrations!
+
+# Plugin directories to scan
+plugin_dirs:
+  - "plugins"
+
+# Global plugin settings
+plugin_settings:
+  parallel_execution_within_band: true
+  plugin_timeout: 120
+  fail_on_plugin_error: false
+  enable_plugin_api: true
+  plugin_health_check_interval: 120
+  include_user_info: false
+
+plugins:
+  # Tool Cost Tracker Plugin - Simple bootcamp demo plugin
+  - name: tool_cost_tracker
+    kind: "tool_cost_tracker.ToolCostTrackerPlugin"
+    enabled: true
+    config:
+      default_cost_per_call: 0.01  # $0.01 per call
+      tool_costs:
+        expensive_api: 0.10
+        database_query: 0.05
+        file_operation: 0.001
+    
+    hooks:
+      - tool_pre_invoke
+      - tool_post_invoke
+
+# Made with Bob
