@@ -1,0 +1,70 @@
+# Configuration for NA_PIIFilterPlugin - Extended PII Filter with MAC Address Detection
+# Author: Nayef Abou Tayoun
+# This configuration extends the base PII filter with MAC address detection capability
+
+plugins:
+  # NA_PIIFilterPlugin - Extended PII Filter with MAC Address Detection
+  - name: "NA_PIIFilterPlugin"
+    kind: "plugins.na_pii_filter_plugin.NA_PIIFilterPlugin"
+    description: "Extended PII Filter with MAC address detection for enhanced security"
+    version: "1.0.0"
+    author: "Nayef Abou Tayoun"
+    hooks: 
+      - "prompt_pre_fetch"
+      - "prompt_post_fetch"
+      - "tool_pre_invoke"
+      - "tool_post_invoke"
+    tags: 
+      - "security"
+      - "pii"
+      - "compliance"
+      - "mac-address"
+      - "gdpr"
+      - "hipaa"
+    mode: "enforce"  # enforce | permissive | disabled
+    priority: 50  # Lower number = higher priority (runs first)
+    conditions:
+      - prompts: []  # Empty list = apply to all prompts
+        server_ids: []  # Apply to all servers
+        tenant_ids: []  # Apply to all tenants
+    config:
+      # ===== BASE PII DETECTION SETTINGS =====
+      # These are passed through to the underlying PIIFilterPlugin
+      
+      # PII Detection Toggles
+      detect_ssn: true                # Social Security Numbers
+      detect_credit_card: true        # Credit card numbers
+      detect_email: true              # Email addresses
+      detect_phone: false             # Phone numbers (disabled for dev)
+      detect_ip_address: false        # IP addresses (disabled for dev)
+      detect_aws_keys: true           # AWS access keys
+      detect_api_keys: true           # API keys
+      
+      # ===== NEW: MAC ADDRESS DETECTION =====
+      # Custom extension for detecting computer MAC addresses
+      detect_computer_mac: true       # Enable MAC address detection
+      mac_mask_strategy: "partial"    # Options: partial | redact | hash | remove
+      
+      # Masking Strategy Explanation:
+      # - partial: Shows first 8 chars, masks rest (e.g., "AA:BB:CC:**:**:**")
+      # - redact: Replaces with "[MAC_REDACTED]"
+      # - hash: Replaces with SHA256 hash (first 16 chars)
+      # - remove: Completely removes the MAC address
+      
+      # ===== BASE PII MASKING SETTINGS =====
+      default_mask_strategy: "partial"  # For non-MAC PII: redact | partial | hash | tokenize | remove
+      redaction_text: "[PII_REDACTED]"  # Text to use for redaction strategy
+      
+      # ===== BEHAVIOR SETTINGS =====
+      block_on_detection: false       # Set to true to block requests with PII
+      log_detections: true            # Log all PII detections for audit
+      include_detection_details: true # Include details about what was detected
+      
+      # ===== WHITELIST =====
+      # Patterns that should NOT be masked (useful for test data)
+      whitelist_patterns:
+        - "test@example.com"
+        - "555-555-5555"
+        - "00:00:00:00:00:00"  # Null MAC address
+
+# Made with Bob
