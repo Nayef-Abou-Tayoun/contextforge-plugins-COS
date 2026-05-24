@@ -1232,9 +1232,9 @@ class Settings(BaseSettings):
     plugins_config_file: str = Field(default="plugins/config.yaml", description="Path to plugin configuration file (local mode)")
     
     # IBM Cloud Object Storage (COS) Plugin Loading
-    plugins_config_source: Literal["local", "cos"] = Field(
+    plugins_config_source: Literal["local", "cos", "both"] = Field(
         default="local",
-        description="Plugin configuration source: 'local' for filesystem, 'cos' for IBM Cloud Object Storage"
+        description="Plugin configuration source: 'local' for filesystem, 'cos' for IBM Cloud Object Storage, 'both' for merged"
     )
     plugins_cos_bucket: Optional[str] = Field(
         default=None,
