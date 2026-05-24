@@ -53,7 +53,7 @@ class COSPluginLoader:
         self.endpoint = os.getenv("PLUGINS_COS_ENDPOINT")
         self.api_key = os.getenv("PLUGINS_COS_API_KEY")
         self.instance_id = os.getenv("PLUGINS_COS_INSTANCE_ID", "")
-        self.config_path = os.getenv("PLUGINS_COS_CONFIG_PATH", "plugins/config.yaml")
+        self.config_path = os.getenv("PLUGINS_COS_CONFIG_PATH", "plugins/config_cos.yaml")
         self.sync_interval = int(os.getenv("PLUGINS_COS_SYNC_INTERVAL", "300"))
 
         # Use temp directory if not specified
