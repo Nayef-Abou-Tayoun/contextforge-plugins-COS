@@ -55,7 +55,7 @@ class ToolCostTrackerPlugin(Plugin):
             f"Default cost: ${self.default_cost:.4f} per call"
         )
 
-    def tool_pre_invoke(self, payload: ToolPreInvokePayload, context: PluginContext) -> ToolPreInvokeResult:
+    async def tool_pre_invoke(self, payload: ToolPreInvokePayload, context: PluginContext) -> ToolPreInvokeResult:
         """Called before a tool is invoked - record start time."""
         # Store start time in metadata for duration calculation
         if not hasattr(payload, '_cost_tracker_start'):
@@ -63,7 +63,7 @@ class ToolCostTrackerPlugin(Plugin):
         
         return ToolPreInvokeResult(payload=payload)
 
-    def tool_post_invoke(self, payload: ToolPostInvokePayload, context: PluginContext) -> ToolPostInvokeResult:
+    async def tool_post_invoke(self, payload: ToolPostInvokePayload, context: PluginContext) -> ToolPostInvokeResult:
         """Called after a tool is invoked - calculate and log cost."""
         tool_name = payload.tool_name
         
