@@ -1,0 +1,36 @@
+# Standalone PII Filter Plugin Configuration
+# This config uses the standalone plugin that doesn't require cpex-pii-filter
+
+plugins:
+  - name: na_pii_filter_standalone
+    module: na_pii_filter_standalone
+    class: NA_PIIFilterStandalonePlugin
+    enabled: true
+    config:
+      # MAC Address Detection
+      detect_computer_mac: true
+      mac_mask_strategy: "partial"  # Options: partial, redact, hash, remove
+      
+      # Email Detection
+      detect_email: true
+      email_mask_strategy: "partial"  # Options: partial, redact, hash, remove
+      
+      # SSN Detection
+      detect_ssn: true
+      ssn_mask_strategy: "redact"  # Options: partial, redact, hash, remove
+      
+      # Credit Card Detection
+      detect_credit_card: true
+      credit_card_mask_strategy: "partial"  # Options: partial, redact, hash, remove
+      
+      # Phone Number Detection
+      detect_phone: true
+      phone_mask_strategy: "partial"  # Options: partial, redact, hash, remove
+    
+    hooks:
+      - prompt_pre_fetch
+      - prompt_post_fetch
+      - tool_pre_invoke
+      - tool_post_invoke
+
+# Made with Bob
