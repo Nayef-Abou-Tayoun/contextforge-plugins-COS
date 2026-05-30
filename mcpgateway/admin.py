@@ -16936,7 +16936,17 @@ async def _render_a2a_plugin_bindings_partial(request: Request, db: Session, tea
     bindings, _ = binding_service.list_bindings(db, team_id=team_id)
     agents = db.query(DbA2AAgent.name).distinct().order_by(DbA2AAgent.name).all()
     agent_names = [a[0] for a in agents]
-    plugin_ids = [p.plugin_id for p in plugin_service.get_all_plugins()]
+    # Fix: Handle both plugin objects and dicts, and catch any errors
+    plugin_ids = []
+    try:
+        for p in plugin_service.get_all_plugins():
+            if hasattr(p, 'plugin_id'):
+                plugin_ids.append(p.plugin_id)
+            elif isinstance(p, dict) and 'plugin_id' in p:
+                plugin_ids.append(p['plugin_id'])
+    except Exception as e:
+        LOGGER.error(f"Error loading plugin IDs for A2A bindings: {e}")
+        plugin_ids = []
     teams = db.execute(select(EmailTeam.id, EmailTeam.name).where(EmailTeam.is_active.is_(True))).all()
     context = {
         "request": request,
