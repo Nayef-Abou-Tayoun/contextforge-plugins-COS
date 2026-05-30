@@ -15,35 +15,6 @@ plugin_settings:
   include_user_info: false
 
 plugins:
-  # Tool Cost Tracker Plugin - Simple bootcamp demo plugin
-  - name: tool_cost_tracker
-    kind: "tool_cost_tracker.ToolCostTrackerPlugin"
-    enabled: true
-    config:
-      default_cost_per_call: 0.01  # $0.01 per call
-      tool_costs:
-        expensive_api: 0.10
-        database_query: 0.05
-        file_operation: 0.001
-        hello: 0.001  # Simple hello tool - minimal cost
-    
-    hooks:
-      - tool_pre_invoke
-      - tool_post_invoke
-
-  # Hello Plugin - Simple greeting plugin for demos
-  - name: hello_plugin
-    kind: "hello_plugin.HelloPlugin"
-    enabled: true
-    config:
-      greeting: "Hello"
-      add_emoji: true
-      log_greetings: true
-    
-    hooks:
-      - tool_pre_invoke
-      - tool_post_invoke
-
   # NA PII Filter Plugin - Enhanced PII detection with MAC address support
   - name: na_pii_filter_plugin
     kind: "na_pii_filter_plugin.NA_PIIFilterPlugin"
@@ -78,20 +49,33 @@ plugins:
       - prompt_pre_fetch
       - prompt_post_fetch
 
-  # How Are You Doing Plugin - Friendly conversational plugin
-  - name: how_are_you_doing
-    kind: "how_are_you_plugin.HowAreYouDoingPlugin"
+  # Cost Analysis Plugin - Comprehensive token tracking and budget management
+  - name: cost_analysis
+    kind: "cost_analysis_plugin.CostAnalysisPlugin"
     enabled: true
     config:
-      add_greeting: true              # Add "How are you doing?" before tools
-      add_encouragement: true         # Add encouraging messages after tools
-      use_random_messages: true       # Use random variations of messages
-      custom_greeting: null           # Optional: Set custom greeting message
-      custom_encouragement: null      # Optional: Set custom encouragement message
-      log_interactions: true          # Log friendly messages
+      # Pricing configuration (cost per 1,000 tokens)
+      pricing:
+        input_cost_per_1k: 0.01    # $0.01 per 1K input tokens
+        output_cost_per_1k: 0.03   # $0.03 per 1K output tokens
+      
+      # Budget limits (in USD)
+      budgets:
+        daily_limit: 100.0          # $100 total daily budget
+        monthly_limit: 3000.0       # $3000 total monthly budget
+        per_user_daily_limit: 10.0  # $10 per user daily budget
+      
+      # Alert configuration
+      alerts:
+        warning_threshold: 0.75     # Warn at 75% of budget
+        critical_threshold: 0.90    # Critical alert at 90% of budget
+        block_on_exceeded: false    # Don't block requests when budget exceeded
+        webhook_url: null           # Optional: Slack/Teams webhook URL
+        email: null                 # Optional: Email for alerts
     
     hooks:
       - tool_pre_invoke
       - tool_post_invoke
 
 # Made with Bob
+
