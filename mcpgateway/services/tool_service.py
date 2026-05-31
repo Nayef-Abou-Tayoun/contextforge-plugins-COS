@@ -5334,6 +5334,7 @@ class ToolService(BaseService):
                         """
                         # Use explicitly passed arguments instead of closure variable
                         # This ensures we use the plugin-modified values
+                        nonlocal arguments
                         if tool_arguments is not None:
                             arguments = tool_arguments
                             logger.info(f"🔧 SSE: Using passed tool_arguments: {arguments}")
@@ -5528,6 +5529,7 @@ class ToolService(BaseService):
                         """
                         # Use explicitly passed arguments instead of closure variable
                         # This ensures we use the plugin-modified values
+                        nonlocal arguments
                         if tool_arguments is not None:
                             arguments = tool_arguments
                             logger.info(f"🔧 StreamableHTTP: Using passed tool_arguments: {arguments}")
