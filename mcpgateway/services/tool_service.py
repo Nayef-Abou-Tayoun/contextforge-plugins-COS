@@ -5300,6 +5300,7 @@ class ToolService(BaseService):
                             local_contexts=context_table,  # Pass context from previous hooks
                             violations_as_exceptions=True,
                         )
+                        logger.info(f"🔍 DEBUG: pre_result type: {type(pre_result)}, has modified_payload: {hasattr(pre_result, 'modified_payload')}, value: {getattr(pre_result, 'modified_payload', 'NO_ATTR')}")
                         if pre_result.modified_payload:
                             payload = pre_result.modified_payload
                             name = payload.name
