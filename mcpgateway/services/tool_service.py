@@ -5288,12 +5288,40 @@ class ToolService(BaseService):
                             ),
                         )
 
-                    async def connect_to_sse_server(server_url: str, headers: dict = headers):
+                    # Run tool_pre_invoke hooks for MCP tools (same as REST path)
+                    if plugin_manager and plugin_manager.has_hooks_for(ToolHookType.TOOL_PRE_INVOKE) and not skip_pre_invoke:
+                        # Use pre-created Pydantic model from Phase 2 (no ORM access)
+                        if tool_metadata:
+                            global_context.metadata[TOOL_METADATA] = tool_metadata
+                        pre_result, context_table = await plugin_manager.invoke_hook(
+                            ToolHookType.TOOL_PRE_INVOKE,
+                            payload=ToolPreInvokePayload(name=name, args=arguments, headers=HttpHeaderPayload(root=headers)),
+                            global_context=global_context,
+                            local_contexts=context_table,  # Pass context from previous hooks
+                            violations_as_exceptions=True,
+                        )
+                        if pre_result.modified_payload:
+                            payload = pre_result.modified_payload
+                            name = payload.name
+                            # Convert CopyOnWriteDict to plain dict to ensure modifications persist
+                            arguments = dict(payload.args) if payload.args else {}
+                            logger.info(f"🔧 Plugin modified arguments (type after conversion: {type(arguments)}): {arguments}")
+                            if payload.headers is not None:
+                                headers = payload.headers.model_dump()
+
+                    # OAuth authorization_code deny-path: if we entered the no-DB-token branch
+                    # above and no plugin (or other auth source) injected an Authorization header,
+                    # fail locally with an actionable error rather than relying on upstream 401.
+                    if oauth_authcode_no_db_token and not any(hk.lower() == "authorization" for hk in headers):
+                        raise ToolInvocationError(f"Please authorize {gateway_name} first. Visit /oauth/authorize/{gateway_id_str} to complete OAuth flow.")
+
+                    async def connect_to_sse_server(server_url: str, headers: dict = headers, tool_arguments: dict = None):
                         """Connect to an MCP server running with SSE transport.
 
                         Args:
                             server_url: MCP Server SSE URL
                             headers: HTTP headers to include in the request
+                            tool_arguments: Tool arguments (passed explicitly to use plugin-modified values)
 
                         Returns:
                             ToolResult: Result of tool call
@@ -5304,6 +5332,13 @@ class ToolService(BaseService):
                             BaseException: On connection or communication errors
 
                         """
+                        # Use explicitly passed arguments instead of closure variable
+                        # This ensures we use the plugin-modified values
+                        if tool_arguments is not None:
+                            arguments = tool_arguments
+                            logger.info(f"🔧 SSE: Using passed tool_arguments: {arguments}")
+                        else:
+                            logger.info(f"🔧 SSE: Using closure arguments: {arguments}")
                         # Get correlation ID for distributed tracing
                         correlation_id = get_correlation_id()
                         tracing_active = otel_context_active()
@@ -5475,12 +5510,13 @@ class ToolService(BaseService):
                             )
                             raise
 
-                    async def connect_to_streamablehttp_server(server_url: str, headers: dict = headers):
+                    async def connect_to_streamablehttp_server(server_url: str, headers: dict = headers, tool_arguments: dict = None):
                         """Connect to an MCP server running with Streamable HTTP transport.
 
                         Args:
                             server_url: MCP Server URL
                             headers: HTTP headers to include in the request
+                            tool_arguments: Tool arguments (passed explicitly to use plugin-modified values)
 
                         Returns:
                             ToolResult: Result of tool call
@@ -5490,6 +5526,13 @@ class ToolService(BaseService):
                             ToolTimeoutError: If the tool invocation times out.
                             BaseException: On connection or communication errors
                         """
+                        # Use explicitly passed arguments instead of closure variable
+                        # This ensures we use the plugin-modified values
+                        if tool_arguments is not None:
+                            arguments = tool_arguments
+                            logger.info(f"🔧 StreamableHTTP: Using passed tool_arguments: {arguments}")
+                        else:
+                            logger.info(f"🔧 StreamableHTTP: Using closure arguments: {arguments}")
                         # Get correlation ID for distributed tracing
                         correlation_id = get_correlation_id()
                         tracing_active = otel_context_active()
@@ -5664,26 +5707,10 @@ class ToolService(BaseService):
                     # REMOVED: Redundant gateway query - gateway already eager-loaded via joinedload
                     # tool_gateway = db.execute(select(DbGateway).where(DbGateway.id == tool_gateway_id)...)
 
-                    plugin_manager = await self._get_plugin_manager(plugin_context_id)
-                    if plugin_manager and plugin_manager.has_hooks_for(ToolHookType.TOOL_PRE_INVOKE) and not skip_pre_invoke:
-                        # Use pre-created Pydantic models from Phase 2 (no ORM access)
-                        if tool_metadata:
-                            global_context.metadata[TOOL_METADATA] = tool_metadata
-                        if gateway_metadata:
-                            global_context.metadata[GATEWAY_METADATA] = gateway_metadata
-                        pre_result, context_table = await plugin_manager.invoke_hook(
-                            ToolHookType.TOOL_PRE_INVOKE,
-                            payload=ToolPreInvokePayload(name=name, args=arguments, headers=HttpHeaderPayload(root=headers)),
-                            global_context=global_context,
-                            local_contexts=None,
-                            violations_as_exceptions=True,
-                        )
-                        if pre_result.modified_payload:
-                            payload = pre_result.modified_payload
-                            name = payload.name
-                            arguments = payload.args
-                            if payload.headers is not None:
-                                headers = payload.headers.model_dump()
+                    # NOTE: Plugin hooks for MCP tools are now invoked earlier (before transport
+                    # function definitions at line ~5291) so that modified arguments are captured
+                    # in the function closures. The previous hook invocation here was redundant
+                    # and ineffective because it happened after the functions captured variables.
 
                     # Defense in depth: strip X-Vault-Tokens (case-insensitive) from outbound
                     # headers. The Vault plugin removes this header when it processes the token,
@@ -5703,9 +5730,9 @@ class ToolService(BaseService):
                     with create_child_span("tool.gateway_call", {"tool.name": name, "tool.id": tool_id, "tool.integration_type": "MCP"}):
                         tool_call_result = ToolResult(content=[TextContent(text="", type="text")])
                         if transport == "sse":
-                            tool_call_result = await connect_to_sse_server(gateway_url, headers=headers)
+                            tool_call_result = await connect_to_sse_server(gateway_url, headers=headers, tool_arguments=arguments)
                         elif transport == "streamablehttp":
-                            tool_call_result = await connect_to_streamablehttp_server(gateway_url, headers=headers)
+                            tool_call_result = await connect_to_streamablehttp_server(gateway_url, headers=headers, tool_arguments=arguments)
 
                         # In direct proxy mode, preserve the upstream response verbatim
                         # (no jsonpath filtering, no structured/unstructured split) but
